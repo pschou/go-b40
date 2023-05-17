@@ -33,13 +33,4 @@ ok      _/home/schou/git/go-b40 7.190s
   b := DecompressToString(db)
   fmt.Printf("Decompress: %v\n", b)
   // Decompress: helloworld
-
-  b2 := []byte(b)
-  ByteToB40(b2)
-  fmt.Printf("b40: %v\n", b2)
-  // b40: [21 18 25 25 28 36 28 31 25 17]
-
-  B40ToByte(b2)
-  fmt.Printf("byte: %v\n", b2)
-  // byte: [104 101 108 108 111 119 111 114 108 100]
 ```

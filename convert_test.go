@@ -17,9 +17,9 @@ func ExampleCompressString() {
 	b := DecompressToString(db)
 	fmt.Printf("Decompress: %v\n", b)
 	b2 := []byte(b)
-	ByteToB40(b2)
+	ByteToB40(b2, b2) // output, input
 	fmt.Printf("b40: %v\n", b2)
-	B40ToByte(b2)
+	B40ToByte(b2, b2) // output, input
 	fmt.Printf("byte: %v\n", b2)
 	// Output:
 	// In: helloworld
