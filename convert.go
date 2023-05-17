@@ -7,7 +7,7 @@ import (
 
 var (
 	byteToB40Lookup [3 * 256]uint16
-	b40ToByteLookup [40 * 1600]uint32
+	b40ToByteLookup [3 * 40 * 1600]byte
 	byteToB40Map    [256]byte
 	keep24          = func() uint32 {
 		dat := [8]byte{0xff, 0xff, 0xff, 0}
@@ -41,9 +41,9 @@ func SetMap() {
 		byteToB40Lookup[256+c] |= uint16(i) * 40
 		byteToB40Lookup[512+c] |= uint16(i)
 	}
-	for i := 0; i < 40*1600; i++ {
-		dat := [4]byte{B40ToByteMap[i/1600], B40ToByteMap[(i/40)%40], B40ToByteMap[i%40], 0}
-		b40ToByteLookup[i] = *(*uint32)(unsafe.Pointer(&dat))
+	for i, j := 0, 0; j < 40*1600; i, j = i+3, j+1 {
+		b40ToByteLookup[i], b40ToByteLookup[i+1], b40ToByteLookup[i+2] =
+			B40ToByteMap[j/1600], B40ToByteMap[(j/40)%40], B40ToByteMap[j%40]
 	}
 }
 
@@ -144,20 +144,25 @@ func decomp(dst, src []byte, olen, ilen uintptr) []byte {
 	ip := ipstart + ilen - 2
 	blp := uintptr(unsafe.Pointer(&b40ToByteLookup))
 
-	var j uint32
-	j = *(*uint32)(unsafe.Pointer(blp + uintptr(bswap16(*(*uint16)(unsafe.Pointer(ip))))<<2))
-	*(*uint32)(unsafe.Pointer(op)) = j
-	ip -= 2
-	for ip >= ipstart {
+	i := blp + uintptr(bswap16(*(*uint16)(unsafe.Pointer(ip))))*3
+	*(*byte)(unsafe.Pointer(op)) = *(*byte)(unsafe.Pointer(i))
+	a := *(*byte)(unsafe.Pointer(i + 1))
+	*(*byte)(unsafe.Pointer(op + 1)) = a
+	b := *(*byte)(unsafe.Pointer(i + 2))
+	*(*byte)(unsafe.Pointer(op + 2)) = b
+
+	for ip -= 2; ip >= ipstart; ip -= 2 {
 		op -= 3
-		k := *(*uint32)(unsafe.Pointer(blp + uintptr(bswap16(*(*uint16)(unsafe.Pointer(ip))))<<2))
-		*(*uint32)(unsafe.Pointer(op)) = k&keep24 | *(*uint32)(unsafe.Pointer(op)) & ^keep24
-		ip -= 2
+		i = blp + uintptr(bswap16(*(*uint16)(unsafe.Pointer(ip))))*3
+		*(*byte)(unsafe.Pointer(op)) = *(*byte)(unsafe.Pointer(i))
+		*(*byte)(unsafe.Pointer(op + 1)) = *(*byte)(unsafe.Pointer(i + 1))
+		*(*byte)(unsafe.Pointer(op + 2)) = *(*byte)(unsafe.Pointer(i + 2))
 	}
-	switch {
-	case j&mask16 == 0:
-		return dst[:olen-2]
-	case j&mask8 == 0:
+
+	if a == 0 {
+		if b == 0 {
+			return dst[:olen-2]
+		}
 		return dst[:olen-1]
 	}
 	return dst[:olen]
