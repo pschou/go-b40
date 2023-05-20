@@ -5,11 +5,16 @@ import (
 	"unsafe"
 )
 
-var (
+type Encoding struct {
+	// Mapping to use for B40 lookups
 	byteToB40Lookup [3 * 256]uint16
 	b40ToByteLookup [3 * 40 * 1600]byte
 	byteToB40Map    [256]byte
-	keep24          = func() uint32 {
+	b40ToByteMap    [40]byte
+}
+
+var (
+	keep24 = func() uint32 {
 		dat := [8]byte{0xff, 0xff, 0xff, 0}
 		return *(*uint32)(unsafe.Pointer(&dat))
 	}()
@@ -25,84 +30,78 @@ var (
 		dat := [8]byte{0, 0, 0, 0xff}
 		return *(*uint32)(unsafe.Pointer(&dat))
 	}()
-
-	// Mapping to use for B40 lookups
-	B40ToByteMap = "\x00-.1234567890:abcdefghijklmnopqrstuvwxyz"
+	Standard = NewEncoding("\x00-.1234567890:abcdefghijklmnopqrstuvwxyz")
 )
 
 // Reset the lookup table with a different b40 conversion after setting the B40ToByteMap value.
-func SetMap() {
-	for i := range byteToB40Map {
-		byteToB40Map[i] = 0
-	}
+func NewEncoding(B40ToByteMap string) (e *Encoding) {
+	e = &Encoding{}
+	copy(e.b40ToByteMap[:], s2b(B40ToByteMap))
 	for i, c := range B40ToByteMap {
-		byteToB40Map[c] = byte(i)
-		byteToB40Lookup[c] |= uint16(i) * 1600
-		byteToB40Lookup[256+c] |= uint16(i) * 40
-		byteToB40Lookup[512+c] |= uint16(i)
+		e.byteToB40Map[c] = byte(i)
+		e.byteToB40Lookup[c] |= uint16(i) * 1600
+		e.byteToB40Lookup[256+c] |= uint16(i) * 40
+		e.byteToB40Lookup[512+c] |= uint16(i)
 	}
 	for i, j := 0, 0; j < 40*1600; i, j = i+3, j+1 {
-		b40ToByteLookup[i], b40ToByteLookup[i+1], b40ToByteLookup[i+2] =
+		e.b40ToByteLookup[i], e.b40ToByteLookup[i+1], e.b40ToByteLookup[i+2] =
 			B40ToByteMap[j/1600], B40ToByteMap[(j/40)%40], B40ToByteMap[j%40]
 	}
-}
-
-func init() {
-	SetMap()
+	return
 }
 
 // Converting one byte at a time.
-func B40ToByte(out, in []byte) {
+func (e *Encoding) B40ToByte(out, in []byte) {
 	for i, c := range in {
-		out[i] = B40ToByteMap[c]
+		out[i] = e.b40ToByteMap[c]
 	}
 }
 
 // Converting one byte at a time.
-func ByteToB40(out, in []byte) {
+func (e *Encoding) ByteToB40(out, in []byte) {
 	for i, c := range in {
-		out[i] = byteToB40Map[c]
+		out[i] = e.byteToB40Map[c]
 	}
 }
 
 // Compress a string into a b40 binary representation.
-func CompressString(src string) (dst []byte) {
+func (e *Encoding) CompressString(src string) (dst []byte) {
 	ilen := len(src)
 	olen := (ilen + 2) / 3 * 2
 	dst = make([]byte, olen)
-	return comp(dst, s2b(src), uintptr(olen), uintptr(ilen))
+	return e.comp(dst, s2b(src), uintptr(olen), uintptr(ilen))
 }
 
 // Compress a slice to a b40 binary representation from a byte format.
 //
 // Note: The DST and SRC can be the same to prevent an additional malloc call.
 // The returned slice is truncated to the proper length.
-func Compress(dst, src []byte) []byte {
+func (e *Encoding) Compress(dst, src []byte) []byte {
 	ilen := len(src)
 	olen := (ilen + 2) / 3 * 2
-	return comp(dst, src, uintptr(olen), uintptr(ilen))
+	return e.comp(dst, src, uintptr(olen), uintptr(ilen))
 }
 
-func comp(dst, src []byte, olen, ilen uintptr) []byte {
+func (e *Encoding) comp(dst, src []byte, olen, ilen uintptr) []byte {
 	ip := (*reflect.StringHeader)(unsafe.Pointer(&src)).Data
 	op := (*reflect.SliceHeader)(unsafe.Pointer(&dst)).Data
 	ipstop := ip + ilen - 2
 	var c int
 	for ip < ipstop {
-		c = int(byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip)))]) +
-			int(byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip + 1)))|0x0100]) +
-			int(byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip + 2)))|0x0200])
+		c = int(e.byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip)))]) +
+			int(e.byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip + 1)))|0x0100]) +
+			int(e.byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip + 2)))|0x0200])
 		*(*uint16)(unsafe.Pointer(op)) = bswap16(uint16(c))
 		op += 2
 		ip += 3
 	}
 	switch ip - ipstop {
 	case 0:
-		c = int(byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip)))]) +
-			int(byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip + 1)))|0x0100])
+		c = int(e.byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip)))]) +
+			int(e.byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip + 1)))|0x0100])
 		*(*uint16)(unsafe.Pointer(op)) = bswap16(uint16(c))
 	case 1:
-		c = int(byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip)))])
+		c = int(e.byteToB40Lookup[int(*(*byte)(unsafe.Pointer(ip)))])
 		*(*uint16)(unsafe.Pointer(op)) = bswap16(uint16(c))
 	}
 	return dst[:olen]
@@ -122,27 +121,27 @@ func s2b(value string) (b []byte) {
 }
 
 // Decompress a string from a b40 binary representation.
-func DecompressToString(src []byte) string {
+func (e *Encoding) DecompressToString(src []byte) string {
 	ilen := len(src)
 	olen := (ilen + 1) / 2 * 3
 	dst := make([]byte, olen+7)
-	return b2s(decomp(dst, src, uintptr(olen), uintptr(ilen)))
+	return b2s(e.decomp(dst, src, uintptr(olen), uintptr(ilen)))
 }
 
 // Decompress a slice from a b40 binary representation to the original byte format.
 //
 // Note: The DST and SRC can be the same to prevent an additional malloc call.
 // The returned slice is truncated to the proper length.
-func Decompress(dst, src []byte, srcLen int) []byte {
+func (e *Encoding) Decompress(dst, src []byte, srcLen int) []byte {
 	olen := (srcLen + 1) / 2 * 3
-	return decomp(dst, src, uintptr(olen), uintptr(srcLen))
+	return e.decomp(dst, src, uintptr(olen), uintptr(srcLen))
 }
 
-func decomp(dst, src []byte, olen, ilen uintptr) []byte {
+func (e *Encoding) decomp(dst, src []byte, olen, ilen uintptr) []byte {
 	ipstart := (*reflect.SliceHeader)(unsafe.Pointer(&src)).Data
 	op := (*reflect.SliceHeader)(unsafe.Pointer(&dst)).Data + (ilen+1)/2*3 - 3
 	ip := ipstart + ilen - 2
-	blp := uintptr(unsafe.Pointer(&b40ToByteLookup))
+	blp := uintptr(unsafe.Pointer(&e.b40ToByteLookup))
 
 	i := blp + uintptr(bswap16(*(*uint16)(unsafe.Pointer(ip))))*3
 	*(*byte)(unsafe.Pointer(op)) = *(*byte)(unsafe.Pointer(i))

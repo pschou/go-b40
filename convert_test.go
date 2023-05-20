@@ -12,14 +12,14 @@ func ExampleCompressString() {
 	dat := "helloworld"
 
 	fmt.Printf("In: %s\n", dat)
-	db := CompressString(dat)
+	db := Standard.CompressString(dat)
 	fmt.Printf("Compress: %v\n", db)
-	b := DecompressToString(db)
+	b := Standard.DecompressToString(db)
 	fmt.Printf("Decompress: %v\n", b)
 	b2 := []byte(b)
-	ByteToB40(b2, b2) // output, input
+	Standard.ByteToB40(b2, b2) // output, input
 	fmt.Printf("b40: %v\n", b2)
-	B40ToByte(b2, b2) // output, input
+	Standard.B40ToByte(b2, b2) // output, input
 	fmt.Printf("byte: %v\n", b2)
 	// Output:
 	// In: helloworld
@@ -32,13 +32,13 @@ func ExampleCompressString() {
 func BenchmarkBase40encode(b *testing.B) {
 	dat := "helloworld"
 	for n := 0; n < b.N; n++ {
-		CompressString(dat)
+		Standard.CompressString(dat)
 	}
 }
 func BenchmarkBase40decode(b *testing.B) {
 	isB40 := []byte{134, 41, 160, 196, 179, 241, 106, 64}
 	for n := 0; n < b.N; n++ {
-		DecompressToString(isB40)
+		Standard.DecompressToString(isB40)
 	}
 }
 func BenchmarkCBase64decode(b *testing.B) {
