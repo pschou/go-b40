@@ -33,7 +33,7 @@ var (
 	}()
 
 	// The standard is inspired by the limitations imposed by RFC1034 and RFC2396
-	Standard = NewFoldedEncoding("\x00-.1234567890:abcdefghijklmnopqrstuvwxyz")
+	Standard = NewFoldedEncoding("\x00-.0123456789:abcdefghijklmnopqrstuvwxyz")
 )
 
 // Create an encoding with the lookup table with a different b40 conversion after setting the B40ToByteMap value.
@@ -42,9 +42,9 @@ func NewEncoding(B40ToByteMap string) (e *Encoding) {
 	copy(e.b40ToByteMap[:], s2b(B40ToByteMap))
 	for i, c := range B40ToByteMap {
 		e.byteToB40Map[c] = byte(i)
-		e.byteToB40Lookup[c] |= uint16(i) * 1600
-		e.byteToB40Lookup[256+c] |= uint16(i) * 40
-		e.byteToB40Lookup[512+c] |= uint16(i)
+		e.byteToB40Lookup[c] = uint16(i) * 1600
+		e.byteToB40Lookup[256+c] = uint16(i) * 40
+		e.byteToB40Lookup[512+c] = uint16(i)
 	}
 	for i, j := 0, 0; j < 40*1600; i, j = i+3, j+1 {
 		e.b40ToByteLookup[i], e.b40ToByteLookup[i+1], e.b40ToByteLookup[i+2] =
@@ -59,9 +59,9 @@ func NewFoldedEncoding(B40ToByteMap string) (e *Encoding) {
 	copy(e.b40ToByteMap[:], s2b(B40ToByteMap))
 	for i, c := range strings.ToLower(B40ToByteMap) {
 		e.byteToB40Map[c] = byte(i)
-		e.byteToB40Lookup[c] |= uint16(i) * 1600
-		e.byteToB40Lookup[256+c] |= uint16(i) * 40
-		e.byteToB40Lookup[512+c] |= uint16(i)
+		e.byteToB40Lookup[c] = uint16(i) * 1600
+		e.byteToB40Lookup[256+c] = uint16(i) * 40
+		e.byteToB40Lookup[512+c] = uint16(i)
 	}
 	for i, c := range strings.ToUpper(B40ToByteMap) {
 		e.byteToB40Map[c] = byte(i)
