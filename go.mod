@@ -1,4 +1,4 @@
-module b40
+module github.com/pschou/go-b40
 
 go 1.20
 

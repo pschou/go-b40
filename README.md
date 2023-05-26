@@ -1,3 +1,7 @@
+# Base-40
+
+I designed the base40 encoding in 2020 to solve a challenge of representing 3 character in 2 bytes of data while maintaining byte sort order.  It's simple as it fits very well in the uint16 as in 40x40x40 = 64000 while the max uint16 is 65535.
+
 # Base40 Encoder / Decoder for Golang
 
 An optimized base 40 encoder/decoder module.
